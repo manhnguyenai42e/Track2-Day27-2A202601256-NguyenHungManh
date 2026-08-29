@@ -23,7 +23,11 @@ models:
                 values: ['pending', 'completed', 'refunded', 'cancelled']
 
   - name: stg_customers
+    description: Cleaned customer dimension records with SCD tracking.
     columns:
       - name: customer_id
+        data_tests:
+          - not_null
+      - name: is_active
         data_tests:
           - not_null

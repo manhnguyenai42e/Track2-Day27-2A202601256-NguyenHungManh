@@ -1,18 +1,14 @@
-"""Simple contract validator used as the starter baseline.
+"""Contract validator supporting deterministic checks, type verification, and freshness.
 
-The implementation intentionally covers only common deterministic checks.
-Students are expected to extend it with:
-- stronger type validation/coercion rules,
-- freshness checks,
-- cross-field/cross-table assertions,
-- severity-aware actions (block/quarantine/warn),
-- richer observability metadata.
+Supports both column-based and field-based contracts with severity levels (critical, warning, info).
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -39,11 +35,65 @@ def load_contract(path: str | Path) -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def _validate_type(series: pd.Series, expected_type: str) -> tuple[bool, str]:
+    non_null = series.dropna()
+    if non_null.empty:
+        return True, "empty_series"
+
+    type_norm = str(expected_type).lower().strip()
+    if type_norm in {"integer", "int"}:
+        try:
+            numeric = pd.to_numeric(non_null, errors="coerce")
+            if numeric.isna().any():
+                invalid_count = int(numeric.isna().sum())
+                return False, f"invalid_integer_format_count={invalid_count}"
+            # Check if all numbers are integers (no fractional part)
+            is_int = np.isclose(numeric, np.round(numeric))
+            if not is_int.all():
+                invalid_count = int((~is_int).sum())
+                return False, f"non_integer_values_count={invalid_count}"
+            return True, "valid_integer"
+        except Exception as e:
+            return False, f"type_error: {e}"
+
+    elif type_norm in {"number", "float", "numeric", "double"}:
+        numeric = pd.to_numeric(non_null, errors="coerce")
+        if numeric.isna().any():
+            invalid_count = int(numeric.isna().sum())
+            return False, f"invalid_numeric_count={invalid_count}"
+        return True, "valid_number"
+
+    elif type_norm in {"string", "str", "text"}:
+        is_str = non_null.apply(lambda x: isinstance(x, str))
+        if not is_str.all():
+            invalid_count = int((~is_str).sum())
+            return False, f"non_string_count={invalid_count}"
+        return True, "valid_string"
+
+    elif type_norm in {"datetime", "timestamp"}:
+        parsed = pd.to_datetime(non_null, utc=True, errors="coerce")
+        if parsed.isna().any():
+            invalid_count = int(parsed.isna().sum())
+            return False, f"invalid_datetime_count={invalid_count}"
+        return True, "valid_datetime"
+
+    elif type_norm in {"boolean", "bool"}:
+        is_bool = non_null.apply(lambda x: isinstance(x, (bool, np.bool_)) or str(x).lower() in {"true", "false", "1", "0"})
+        if not is_bool.all():
+            invalid_count = int((~is_bool).sum())
+            return False, f"non_boolean_count={invalid_count}"
+        return True, "valid_boolean"
+
+    return True, f"unknown_type_{expected_type}"
+
+
 def validate_dataframe(df: pd.DataFrame, contract: dict[str, Any]) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
-    columns = contract.get("columns", {})
+    columns = contract.get("columns") or contract.get("fields") or {}
 
     for column, rules in columns.items():
+        if not isinstance(rules, dict):
+            rules = {}
         severity = rules.get("severity", "warning")
         required = bool(rules.get("required", False))
 
@@ -62,6 +112,7 @@ def validate_dataframe(df: pd.DataFrame, contract: dict[str, Any]) -> list[dict[
 
         series = df[column]
 
+        # 1. Not-null check
         if required:
             null_count = int(series.isna().sum())
             issues.append(
@@ -74,6 +125,20 @@ def validate_dataframe(df: pd.DataFrame, contract: dict[str, Any]) -> list[dict[
                 )
             )
 
+        # 2. Type validation
+        if "type" in rules:
+            passed_type, type_details = _validate_type(series, rules["type"])
+            issues.append(
+                _issue(
+                    "type",
+                    column=column,
+                    severity=severity,
+                    passed=passed_type,
+                    details=f"declared_type={rules['type']}; {type_details}",
+                )
+            )
+
+        # 3. Unique check
         if rules.get("unique"):
             duplicate_count = int(series.duplicated(keep=False).sum())
             issues.append(
@@ -86,6 +151,7 @@ def validate_dataframe(df: pd.DataFrame, contract: dict[str, Any]) -> list[dict[
                 )
             )
 
+        # 4. Accepted values check
         accepted = rules.get("accepted_values")
         if accepted is not None:
             invalid_mask = series.notna() & ~series.isin(accepted)
@@ -100,7 +166,7 @@ def validate_dataframe(df: pd.DataFrame, contract: dict[str, Any]) -> list[dict[
                 )
             )
 
-        # Starter numeric range support. Type validation is intentionally minimal.
+        # 5. Numeric range check
         if "min" in rules or "max" in rules:
             numeric = pd.to_numeric(series, errors="coerce")
             invalid = pd.Series(False, index=series.index)
@@ -119,9 +185,55 @@ def validate_dataframe(df: pd.DataFrame, contract: dict[str, Any]) -> list[dict[
                 )
             )
 
-    # TODO(student): validate contract-level freshness using contract['freshness'].
-    # TODO(student): validate declared data types. pd.to_numeric(..., errors='coerce')
-    #                can silently hide string/type drift if you do not check it explicitly.
+        # 6. Min length check for strings
+        if "min_length" in rules:
+            min_len = int(rules["min_length"])
+            str_series = series.dropna().astype(str)
+            too_short = int((str_series.str.len() < min_len).sum())
+            issues.append(
+                _issue(
+                    "min_length",
+                    column=column,
+                    severity=severity,
+                    passed=(too_short == 0),
+                    details=f"too_short_count={too_short}; min_length={min_len}",
+                )
+            )
+
+    # 7. Freshness check at contract level
+    freshness_cfg = contract.get("freshness")
+    if freshness_cfg and isinstance(freshness_cfg, dict):
+        fresh_col = freshness_cfg.get("column")
+        max_delay = float(freshness_cfg.get("max_delay_minutes", 60.0))
+        fresh_severity = freshness_cfg.get("severity", "warning")
+
+        if fresh_col and fresh_col in df.columns and not df[fresh_col].empty:
+            parsed_dates = pd.to_datetime(df[fresh_col], utc=True, errors="coerce")
+            valid_dates = parsed_dates.dropna()
+            if not valid_dates.empty:
+                max_ts = valid_dates.max()
+                now_utc = pd.Timestamp(datetime.now(timezone.utc))
+                delay_minutes = max(0.0, (now_utc - max_ts).total_seconds() / 60.0)
+                is_fresh = delay_minutes <= max_delay
+                issues.append(
+                    _issue(
+                        "freshness",
+                        column=fresh_col,
+                        severity=fresh_severity,
+                        passed=is_fresh,
+                        details=f"delay_minutes={delay_minutes:.1f}; max_delay_minutes={max_delay}",
+                    )
+                )
+            else:
+                issues.append(
+                    _issue(
+                        "freshness",
+                        column=fresh_col,
+                        severity=fresh_severity,
+                        passed=False,
+                        details="freshness_column_has_no_valid_timestamps",
+                    )
+                )
 
     return issues
 
@@ -131,5 +243,18 @@ def failed_issues(issues: list[dict[str, Any]], min_severity: str | None = None)
     if min_severity is None:
         return failed
     order = {"info": 0, "warning": 1, "critical": 2}
-    threshold = order[min_severity]
+    threshold = order.get(min_severity, 1)
     return [i for i in failed if order.get(i.get("severity", "warning"), 1) >= threshold]
+
+
+def determine_action(issues: list[dict[str, Any]]) -> str:
+    """Determine pipeline action based on issues severity."""
+    failed = [i for i in issues if not i.get("passed", False)]
+    if not failed:
+        return "pass"
+    severities = {i.get("severity", "warning") for i in failed}
+    if "critical" in severities:
+        return "block"
+    if "warning" in severities:
+        return "quarantine"
+    return "warn"

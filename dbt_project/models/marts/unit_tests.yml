@@ -1,0 +1,35 @@
+unit_tests:
+  # Basic: 2 completed orders for 1 customer => revenue = sum of amounts
+  - name: completed_orders_sum_to_expected_revenue
+    model: fct_daily_revenue
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1, customer_id: C0001, amount_usd: 100.0, status: completed, order_date: '2026-08-01'}
+          - {order_id: 2, customer_id: C0001, amount_usd: 70.0, status: completed, order_date: '2026-08-01'}
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: C0001, is_active: true}
+    expect:
+      rows:
+        - {order_date: '2026-08-01', completed_order_rows: 2, daily_revenue: 170.0}
+
+  # Strong Challenge: SCD customer dimension has 2 active rows for same
+  # customer_id. The LEFT JOIN in fct_daily_revenue duplicates order rows,
+  # inflating both completed_order_rows and daily_revenue.
+  # This test EXPOSES the bug: expected correct values are 1 row / 100.0,
+  # but the model will produce 2 rows / 200.0 due to the fan-out join.
+  - name: scd_duplicate_customer_inflates_revenue
+    model: fct_daily_revenue
+    expect_failure: true
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 10, customer_id: C0042, amount_usd: 100.0, status: completed, order_date: '2026-08-15'}
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: C0042, is_active: true}
+          - {customer_id: C0042, is_active: true}
+    expect:
+      rows:
+        - {order_date: '2026-08-15', completed_order_rows: 1, daily_revenue: 100.0}
