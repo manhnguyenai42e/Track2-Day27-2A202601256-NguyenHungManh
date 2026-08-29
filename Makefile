@@ -1,6 +1,6 @@
 PYTHON ?= python
 
-.PHONY: reset baseline tests gx dbt dashboard generate
+.PHONY: reset baseline tests gx dbt dashboard web generate
 
 reset:
 	$(PYTHON) scripts/reset_lab.py
@@ -20,6 +20,9 @@ dbt:
 
 dashboard:
 	streamlit run dashboard/app.py
+
+web:
+	$(PYTHON) dashboard/server.py 8000
 
 generate:
 	$(PYTHON) scripts/generate_data.py --rows 600 --days 42 --seed 27

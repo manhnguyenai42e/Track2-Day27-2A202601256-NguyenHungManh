@@ -70,7 +70,9 @@ def main() -> None:
         "orders_rows": int(len(orders)),
         "failed_contract_checks": len(failed),
         "critical_contract_failures": len(critical_failed),
+        "contract_results": issues,
         "kb_failed_checks": len(kb_failed),
+        "kb_contract_results": kb_issues,
         "row_count_anomaly": row_result,
         "freshness_minutes": freshness_minutes,
         "kb_text_length_signal": text_result,
@@ -84,7 +86,19 @@ def main() -> None:
     print(f"orders rows              : {len(orders)}")
     print(f"contract failed checks   : {len(failed)}")
     print(f"critical contract fails  : {len(critical_failed)}")
+    for issue in failed:
+        print(
+            "contract issue           : "
+            f"{issue.get('check')} column={issue.get('column')} "
+            f"severity={issue.get('severity')} details={issue.get('details')}"
+        )
     print(f"KB contract fails        : {len(kb_failed)} (issues={[k['check'] for k in kb_failed]})")
+    for issue in kb_failed:
+        print(
+            "KB contract issue        : "
+            f"{issue.get('check')} column={issue.get('column')} "
+            f"severity={issue.get('severity')} details={issue.get('details')}"
+        )
     print(f"row-count anomaly        : {row_result['is_anomaly']} ({row_result['method']}, score={row_result['score']:.2f})")
     print(f"freshness minutes        : {freshness_minutes:.1f}")
     print(f"KB length anomaly        : {text_result['is_anomaly']}")

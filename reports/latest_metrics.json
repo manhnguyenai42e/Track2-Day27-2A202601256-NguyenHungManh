@@ -1,16 +1,251 @@
 {
-  "timestamp": "2026-08-29T08:47:30.058998+00:00",
+  "timestamp": "2026-08-29T10:16:35.319043+00:00",
   "orders_rows": 600,
   "failed_contract_checks": 0,
   "critical_contract_failures": 0,
+  "contract_results": [
+    {
+      "check": "not_null",
+      "column": "order_id",
+      "severity": "critical",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "order_id",
+      "severity": "critical",
+      "passed": true,
+      "details": "declared_type=integer; valid_integer"
+    },
+    {
+      "check": "unique",
+      "column": "order_id",
+      "severity": "critical",
+      "passed": true,
+      "details": "duplicate_rows=0"
+    },
+    {
+      "check": "not_null",
+      "column": "customer_id",
+      "severity": "critical",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "customer_id",
+      "severity": "critical",
+      "passed": true,
+      "details": "declared_type=string; valid_string"
+    },
+    {
+      "check": "not_null",
+      "column": "amount",
+      "severity": "critical",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "amount",
+      "severity": "critical",
+      "passed": true,
+      "details": "declared_type=number; valid_number"
+    },
+    {
+      "check": "range",
+      "column": "amount",
+      "severity": "critical",
+      "passed": true,
+      "details": "invalid_count=0"
+    },
+    {
+      "check": "not_null",
+      "column": "currency",
+      "severity": "critical",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "currency",
+      "severity": "critical",
+      "passed": true,
+      "details": "declared_type=string; valid_string"
+    },
+    {
+      "check": "accepted_values",
+      "column": "currency",
+      "severity": "critical",
+      "passed": true,
+      "details": "invalid_count=0; accepted=['USD', 'VND']"
+    },
+    {
+      "check": "not_null",
+      "column": "status",
+      "severity": "warning",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "status",
+      "severity": "warning",
+      "passed": true,
+      "details": "declared_type=string; valid_string"
+    },
+    {
+      "check": "accepted_values",
+      "column": "status",
+      "severity": "warning",
+      "passed": true,
+      "details": "invalid_count=0; accepted=['pending', 'completed', 'refunded', 'cancelled']"
+    },
+    {
+      "check": "not_null",
+      "column": "created_at",
+      "severity": "critical",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "created_at",
+      "severity": "critical",
+      "passed": true,
+      "details": "declared_type=datetime; valid_datetime"
+    },
+    {
+      "check": "not_null",
+      "column": "updated_at",
+      "severity": "critical",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "updated_at",
+      "severity": "critical",
+      "passed": true,
+      "details": "declared_type=datetime; valid_datetime"
+    },
+    {
+      "check": "freshness",
+      "column": "updated_at",
+      "severity": "warning",
+      "passed": true,
+      "details": "delay_minutes=14.9; max_delay_minutes=30.0"
+    }
+  ],
   "kb_failed_checks": 0,
+  "kb_contract_results": [
+    {
+      "check": "not_null",
+      "column": "doc_id",
+      "severity": "warning",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "doc_id",
+      "severity": "warning",
+      "passed": true,
+      "details": "declared_type=string; valid_string"
+    },
+    {
+      "check": "not_null",
+      "column": "version",
+      "severity": "warning",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "version",
+      "severity": "warning",
+      "passed": true,
+      "details": "declared_type=integer; valid_integer"
+    },
+    {
+      "check": "not_null",
+      "column": "effective_at",
+      "severity": "warning",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "effective_at",
+      "severity": "warning",
+      "passed": true,
+      "details": "declared_type=datetime; valid_datetime"
+    },
+    {
+      "check": "not_null",
+      "column": "published_at",
+      "severity": "warning",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "published_at",
+      "severity": "warning",
+      "passed": true,
+      "details": "declared_type=datetime; valid_datetime"
+    },
+    {
+      "check": "not_null",
+      "column": "source_uri",
+      "severity": "warning",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "source_uri",
+      "severity": "warning",
+      "passed": true,
+      "details": "declared_type=string; valid_string"
+    },
+    {
+      "check": "not_null",
+      "column": "content",
+      "severity": "warning",
+      "passed": true,
+      "details": "null_count=0"
+    },
+    {
+      "check": "type",
+      "column": "content",
+      "severity": "warning",
+      "passed": true,
+      "details": "declared_type=string; valid_string"
+    },
+    {
+      "check": "min_length",
+      "column": "content",
+      "severity": "warning",
+      "passed": true,
+      "details": "too_short_count=0; min_length=20"
+    },
+    {
+      "check": "freshness",
+      "column": "published_at",
+      "severity": "warning",
+      "passed": true,
+      "details": "delay_minutes=19.9; max_delay_minutes=60.0"
+    }
+  ],
   "row_count_anomaly": {
-    "is_anomaly": true,
+    "is_anomaly": false,
     "score": 18.751099999999997,
-    "method": "auto:seasonal_mad",
-    "reason": "median=252.500, mad=12.500, modified_z=18.751, threshold=3.5"
+    "method": "auto:seasonal_mad+global_crosscheck",
+    "reason": "median=252.500, mad=12.500, modified_z=18.751, threshold=3.5; suppressed: value is within normal range of global history (median=592.500, mad=29.000, modified_z=0.174, threshold=3.5) despite narrow seasonal segment"
   },
-  "freshness_minutes": 5.017094366666667,
+  "freshness_minutes": 14.92188565,
   "kb_text_length_signal": {
     "is_anomaly": false,
     "score": 0.7547940916996035,

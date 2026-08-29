@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Reliability Command Center — Material UI Dashboard</title>
+  
+  <!-- Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Official Google Material Icons (Material UI standard) -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Marked.js for Rendering Markdown in Reports Tab -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="theme-light">
+  <!-- App Container -->
+  <div class="app-container">
+    
+    <!-- Top Navigation Header (Strict 1-Line Layout) -->
+    <header class="navbar">
+      <div class="navbar-left">
+        <div class="brand-badge">
+          <span class="live-dot" id="systemLiveDot"></span>
+          <span class="material-icons-outlined brand-icon">verified_user</span>
+          <div class="brand-text">
+            <span class="brand-title">Data Reliability</span>
+            <span class="brand-subtitle">COMMAND CENTER</span>
+          </div>
+        </div>
+
+        <nav class="nav-links">
+          <button class="nav-item active" data-tab="overview">
+            <span class="material-icons-outlined">dashboard</span>
+            <span>Overview</span>
+          </button>
+          <button class="nav-item" data-tab="contracts">
+            <span class="material-icons-outlined">fact_check</span>
+            <span>Contracts</span>
+          </button>
+          <button class="nav-item" data-tab="anomaly">
+            <span class="material-icons-outlined">query_stats</span>
+            <span>Anomaly</span>
+          </button>
+          <button class="nav-item" data-tab="lineage">
+            <span class="material-icons-outlined">account_tree</span>
+            <span>Lineage</span>
+          </button>
+          <button class="nav-item" data-tab="slo">
+            <span class="material-icons-outlined">speed</span>
+            <span>SLO</span>
+          </button>
+          <button class="nav-item" data-tab="sandbox">
+            <span class="material-icons-outlined">science</span>
+            <span>Sandbox</span>
+          </button>
+          <button class="nav-item" data-tab="reports">
+            <span class="material-icons-outlined">summarize</span>
+            <span>Incidents</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="navbar-right">
+        <div class="header-status" id="headerStatusBadge">
+          <span class="material-icons-outlined status-icon">check_circle</span>
+          <span class="status-label">HEALTHY</span>
+        </div>
+
+        <button class="btn btn-secondary btn-sm" id="btnRefreshData" title="Refresh state">
+          <span class="material-icons-outlined">refresh</span>
+          <span>Refresh</span>
+        </button>
+
+        <button class="btn btn-icon" id="btnThemeToggle" title="Toggle Dark/Light Mode">
+          <span class="material-icons-outlined" id="themeIcon">dark_mode</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Notification / Action Toast Bar -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Quick Action Bar -->
+    <section class="quick-action-strip">
+      <div class="strip-label">
+        <span class="material-icons-outlined">bolt</span>
+        <span>LIVE OPERATIONS</span>
+      </div>
+      <div class="strip-buttons">
+        <button class="action-btn" onclick="executeBackendAction('reset')">
+          <span class="material-icons-outlined">restart_alt</span>
+          <span>Reset Lab</span>
+        </button>
+        <button class="action-btn" onclick="executeBackendAction('baseline')">
+          <span class="material-icons-outlined">play_arrow</span>
+          <span>Run Baseline</span>
+        </button>
+        <button class="action-btn" onclick="executeBackendAction('pytest')">
+          <span class="material-icons-outlined">checklist_rtl</span>
+          <span>Run Tests (all)</span>
+        </button>
+        <button class="action-btn" onclick="executeBackendAction('gx_validate')">
+          <span class="material-icons-outlined">rule</span>
+          <span>GX Checkpoint</span>
+        </button>
+        <button class="action-btn" onclick="executeBackendAction('dbt_build')">
+          <span class="material-icons-outlined">account_tree</span>
+          <span>Run dbt Build</span>
+        </button>
+        <div class="action-divider"></div>
+        <span class="fault-badge-label">Faults:</span>
+        <button class="action-btn btn-danger-soft" onclick="executeBackendAction('inject_duplicate_pk')">
+          <span class="material-icons-outlined">content_copy</span>
+          <span>Duplicate PK</span>
+        </button>
+        <button class="action-btn btn-warning-soft" onclick="executeBackendAction('inject_volume_drop')">
+          <span class="material-icons-outlined">trending_down</span>
+          <span>Volume Drop</span>
+        </button>
+        <button class="action-btn btn-warning-soft" onclick="executeBackendAction('inject_stale_kb')">
+          <span class="material-icons-outlined">history_toggle_off</span>
+          <span>Stale KB</span>
+        </button>
+        <button class="action-btn btn-terminal-toggle" onclick="toggleTerminalLog()">
+          <span class="material-icons-outlined">terminal</span>
+          <span>Logs</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Main Content Panels -->
+    <main class="main-content">
+
+      <!-- ==================== TAB 1: OVERVIEW ==================== -->
+      <section id="tab-overview" class="tab-panel active">
+        <!-- Top KPI Grid -->
+        <div class="kpi-grid">
+          <div class="kpi-card" id="kpiOrdersCard">
+            <div class="kpi-header">
+              <span class="kpi-title">Orders Ingested</span>
+              <span class="material-icons-outlined kpi-icon text-blue">inventory_2</span>
+            </div>
+            <div class="kpi-value" id="valOrdersRows">--</div>
+            <div class="kpi-footer">
+              <span class="badge badge-subtle" id="badgeOrdersSub">Batch Record Count</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpiFreshnessCard">
+            <div class="kpi-header">
+              <span class="kpi-title">Freshness Delay</span>
+              <span class="material-icons-outlined kpi-icon text-green" id="iconFreshness">schedule</span>
+            </div>
+            <div class="kpi-value" id="valFreshnessMin">--</div>
+            <div class="kpi-footer">
+              <span class="badge badge-green" id="badgeFreshness">SLA: contract-defined</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpiContractCard">
+            <div class="kpi-header">
+              <span class="kpi-title">Contract Issues</span>
+              <span class="material-icons-outlined kpi-icon text-red" id="iconContract">fact_check</span>
+            </div>
+            <div class="kpi-value" id="valContractIssues">--</div>
+            <div class="kpi-footer">
+              <span class="badge badge-green" id="badgeContractCritical">0 Critical</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpiKBCard">
+            <div class="kpi-header">
+              <span class="kpi-title">KB AI Contract</span>
+              <span class="material-icons-outlined kpi-icon text-purple">menu_book</span>
+            </div>
+            <div class="kpi-value" id="valKBContractIssues">--</div>
+            <div class="kpi-footer">
+              <span class="badge badge-green" id="badgeKBIssues">Doc Freshness &amp; Schema</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpiSLOCard">
+            <div class="kpi-header">
+              <span class="kpi-title">SLO Target</span>
+              <span class="material-icons-outlined kpi-icon text-indigo">speed</span>
+            </div>
+            <div class="kpi-value" id="valSLOTarget">99.9%</div>
+            <div class="kpi-footer">
+              <span class="badge badge-indigo" id="badgeSLOBurn">Max Error Rate: 0.10%</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpiBudgetCard">
+            <div class="kpi-header">
+              <span class="kpi-title">Error Budget</span>
+              <span class="material-icons-outlined kpi-icon text-green" id="iconBudget">donut_large</span>
+            </div>
+            <div class="kpi-value" id="valBudgetFraction">100.0%</div>
+            <div class="kpi-footer">
+              <span class="badge badge-green" id="badgeBudgetStatus">Healthy (Burn: 0.00x)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2-Column Overview Layout -->
+        <div class="grid-2col">
+          <!-- Left Column -->
+          <div class="col-stack">
+            <!-- SLO Card -->
+            <div class="panel-card">
+              <div class="panel-header">
+                <div class="panel-title-group">
+                  <span class="material-icons-outlined">speed</span>
+                  <h3>SLI / SLO &amp; Error Budget Gauge</h3>
+                </div>
+                <span class="badge badge-green" id="panelSLOBadge">Budget Healthy</span>
+              </div>
+              <div class="panel-body">
+                <div class="metric-row-4">
+                  <div class="submetric">
+                    <span class="submetric-label">Actual Error Rate</span>
+                    <span class="submetric-val" id="sloActualBad">0.000%</span>
+                    <span class="table-subtext">Bad / Total events</span>
+                  </div>
+                  <div class="submetric">
+                    <span class="submetric-label">Max Allowed Error Rate</span>
+                    <span class="submetric-val" id="sloAllowedBad">0.100%</span>
+                    <span class="table-subtext">100% - 99.9% SLO</span>
+                  </div>
+                  <div class="submetric">
+                    <span class="submetric-label">Burn Rate</span>
+                    <span class="submetric-val" id="sloBurnRate">0.00x</span>
+                    <span class="table-subtext">Actual / Allowed rate</span>
+                  </div>
+                  <div class="submetric">
+                    <span class="submetric-label">Alert Policy</span>
+                    <span class="submetric-val text-indigo">Google SRE</span>
+                    <span class="table-subtext">Multi-window logic</span>
+                  </div>
+                </div>
+
+                <div class="progress-section">
+                  <div class="progress-header">
+                    <span>Remaining Error Budget</span>
+                    <strong id="sloBudgetPercent">100.0%</strong>
+                  </div>
+                  <div class="progress-bar-track">
+                    <div class="progress-bar-fill fill-green" id="sloProgressBar" style="width: 100%;"></div>
+                  </div>
+                  <div class="progress-footer">
+                    <span>0% (SLO Breach)</span>
+                    <span class="text-subtle">Target 99.90% Reliability (0.10% Error Allowance)</span>
+                    <span>100% (Full Budget)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Anomaly Signals Card -->
+            <div class="panel-card">
+              <div class="panel-header">
+                <div class="panel-title-group">
+                  <span class="material-icons-outlined">monitoring</span>
+                  <h3>Statistical Anomaly &amp; Drift Signals</h3>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div class="signal-item" id="sigVolumeItem">
+                  <div class="signal-left">
+                    <div class="signal-icon-box" id="sigVolumeIconBox">
+                      <span class="material-icons-outlined" id="sigVolumeIcon">inventory_2</span>
+                    </div>
+                    <div>
+                      <div class="signal-title">Order Volume Ingestion</div>
+                      <div class="signal-subtitle" id="sigVolumeMethod">Method: auto:seasonal_mad</div>
+                    </div>
+                  </div>
+                  <div class="signal-right">
+                    <div class="signal-score" id="sigVolumeScore">Score: 0.17</div>
+                    <span class="badge badge-green" id="sigVolumeBadge">NORMAL</span>
+                  </div>
+                </div>
+
+                <div class="signal-item" id="sigKBItem">
+                  <div class="signal-left">
+                    <div class="signal-icon-box" id="sigKBIconBox">
+                      <span class="material-icons-outlined" id="sigKBIcon">menu_book</span>
+                    </div>
+                    <div>
+                      <div class="signal-title">Knowledge Base Text Length Drift</div>
+                      <div class="signal-subtitle" id="sigKBMethod">Mean: 15.6 tokens</div>
+                    </div>
+                  </div>
+                  <div class="signal-right">
+                    <div class="signal-score" id="sigKBScore">Score: 0.75</div>
+                    <span class="badge badge-green" id="sigKBBadge">STABLE</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Historical Trend Preview -->
+            <div class="panel-card">
+              <div class="panel-header">
+                <div class="panel-title-group">
+                  <span class="material-icons-outlined">trending_up</span>
+                  <h3>Order Volume History (Last 42 Days)</h3>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div class="chart-container" style="height: 200px;">
+                  <canvas id="overviewHistoryChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column -->
+          <div class="col-stack">
+            <!-- Blast Radius Card -->
+            <div class="panel-card">
+              <div class="panel-header">
+                <div class="panel-title-group">
+                  <span class="material-icons-outlined">account_tree</span>
+                  <h3>Blast Radius from <code>stg_orders</code></h3>
+                </div>
+                <span class="badge badge-indigo" id="badgeBlastCount">2 Downstream</span>
+              </div>
+              <div class="panel-body">
+                <p class="panel-desc">
+                  Transitive impact graph traversing downstream mart &amp; consumer nodes in BFS order:
+                </p>
+                <div class="blast-flow" id="overviewBlastFlow">
+                  <span class="node-chip chip-source">stg_orders</span>
+                  <span class="flow-arrow material-icons-outlined">arrow_forward</span>
+                  <span class="node-chip chip-affected">fct_daily_revenue</span>
+                  <span class="flow-arrow material-icons-outlined">arrow_forward</span>
+                  <span class="node-chip chip-affected">ceo_revenue_dashboard</span>
+                </div>
+
+                <div class="divider"></div>
+                <div class="sub-header-line">
+                  <span class="material-icons-outlined">hub</span>
+                  <span>Dataset Lineage Nodes</span>
+                </div>
+                <div class="table-responsive">
+                  <table class="data-table" id="overviewLineageTable">
+                    <thead>
+                      <tr>
+                        <th>Source Node</th>
+                        <th>Downstream Dependents</th>
+                      </tr>
+                    </thead>
+                    <tbody id="overviewLineageTbody">
+                      <!-- Populated via JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Contract Summary Card -->
+            <div class="panel-card">
+              <div class="panel-header">
+                <div class="panel-title-group">
+                  <span class="material-icons-outlined">gavel</span>
+                  <h3>Contract Enforcement &amp; Pipeline Action</h3>
+                </div>
+                <span class="badge badge-green" id="overviewActionBadge">PASS</span>
+              </div>
+              <div class="panel-body">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Rule / Contract</th>
+                      <th>Status</th>
+                      <th>Action Policy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <strong>Orders Schema &amp; Type</strong>
+                        <div class="table-subtext">orders_contract.yaml (not_null, unique, types)</div>
+                      </td>
+                      <td><span class="badge badge-green" id="rowStatusSchema">PASS</span></td>
+                      <td><span class="badge badge-red-outline">Block on Critical</span></td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>Orders Ingestion Freshness</strong>
+                        <div class="table-subtext" id="ordersFreshnessSummary">Max lag: contract-defined</div>
+                      </td>
+                      <td><span class="badge badge-green" id="rowStatusFreshness">PASS</span></td>
+                      <td><span class="badge badge-yellow-outline">Quarantine on Lag</span></td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>Knowledge Base Contract</strong>
+                        <div class="table-subtext">kb_contract.yaml (freshness &amp; min_length)</div>
+                      </td>
+                      <td><span class="badge badge-green" id="rowStatusKB">PASS</span></td>
+                      <td><span class="badge badge-yellow-outline">Warning</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <h4 class="section-subtitle"><span class="material-icons-outlined">fact_check</span> Latest Validation Result</h4>
+            <div class="table-responsive">
+              <table class="data-table" id="contractResultsTable">
+                <thead>
+                  <tr><th>Check</th><th>Column</th><th>Status</th><th>Severity</th><th>Details</th></tr>
+                </thead>
+                <tbody id="contractResultsTbody"><tr><td colspan="5" class="table-subtext">Loading baseline validation...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 2: DATA CONTRACTS ==================== -->
+      <section id="tab-contracts" class="tab-panel">
+        <div class="panel-card">
+            <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="material-icons-outlined">fact_check</span>
+              <h3>Data Contracts Studio</h3>
+            </div>
+            <div class="tab-btn-group">
+              <button class="subtab-btn active" onclick="switchContractTab('orders')">orders_contract.yaml</button>
+              <button class="subtab-btn" onclick="switchContractTab('kb')">kb_contract.yaml</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="grid-2col">
+              <div>
+                <h4 class="section-subtitle"><span class="material-icons-outlined">code</span> Raw Contract Definition</h4>
+                <pre class="code-block" id="contractYamlViewer">Loading contract YAML...</pre>
+              </div>
+              <div>
+                <h4 class="section-subtitle"><span class="material-icons-outlined">rule_folder</span> Active Validations &amp; Constraints</h4>
+                <div class="table-responsive">
+                  <table class="data-table" id="contractRulesTable">
+                    <thead>
+                      <tr>
+                        <th>Field / Column</th>
+                        <th>Type</th>
+                        <th>Constraints</th>
+                        <th>Severity</th>
+                      </tr>
+                    </thead>
+                    <tbody id="contractRulesTbody">
+                      <!-- Injected via JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 3: ANOMALY & DRIFT ==================== -->
+      <section id="tab-anomaly" class="tab-panel">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="material-icons-outlined">query_stats</span>
+              <h3>Time-Series Observability &amp; Drift Detection Engine</h3>
+            </div>
+            <div class="chart-controls">
+              <button class="subtab-btn active" onclick="switchMetricChart('row_count')">Volume</button>
+              <button class="subtab-btn" onclick="switchMetricChart('avg_amount')">Avg Amount</button>
+              <button class="subtab-btn" onclick="switchMetricChart('null_rate')">Null Rate</button>
+              <button class="subtab-btn" onclick="switchMetricChart('mean_text_length')">KB Length</button>
+              <button class="subtab-btn" onclick="switchMetricChart('embedding_norm_mean')">Embedding Norm</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="chart-container" style="height: 320px;">
+              <canvas id="detailedMetricsChart"></canvas>
+            </div>
+
+            <div class="grid-3col" style="margin-top: 24px;">
+              <div class="sub-card">
+                <div class="sub-card-title"><span class="material-icons-outlined">calculate</span> Median Absolute Deviation (MAD)</div>
+                <p class="panel-desc">Robust statistical estimator insensitive to extreme outliers in baseline history. Computes <code>0.6745 * |x - median| / MAD</code>.</p>
+              </div>
+              <div class="sub-card">
+                <div class="sub-card-title"><span class="material-icons-outlined">calendar_month</span> Seasonality &amp; Segment Baselines</div>
+                <p class="panel-desc">Compares current value specifically with the same day-of-week segment to eliminate false positives caused by natural weekend order volume drops.</p>
+              </div>
+              <div class="sub-card">
+                <div class="sub-card-title"><span class="material-icons-outlined">compare_arrows</span> Kolmogorov-Smirnov (KS) Test</div>
+                <p class="panel-desc">Two-sample non-parametric distribution test detecting subtle shape and variance shifts even when mean values remain identical.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 4: LINEAGE & BLAST ==================== -->
+      <section id="tab-lineage" class="tab-panel">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="material-icons-outlined">account_tree</span>
+              <h3>Interactive Lineage &amp; Blast Radius Explorer</h3>
+            </div>
+            <div class="legend-group">
+              <span class="legend-item"><span class="legend-dot bg-blue"></span> Source Asset</span>
+              <span class="legend-item"><span class="legend-dot bg-amber"></span> Downstream Mart</span>
+              <span class="legend-item"><span class="legend-dot bg-green"></span> End Consumer</span>
+              <span class="legend-item"><span class="legend-dot bg-red"></span> Click to Trace Blast</span>
+            </div>
+          </div>
+          <div class="panel-body">
+            <p class="panel-desc">
+              Click any node in the graph to dynamically calculate and highlight the entire transitive downstream blast radius:
+            </p>
+            <div class="lineage-canvas-box">
+              <canvas id="lineageCanvas" width="960" height="360"></canvas>
+            </div>
+
+            <div class="blast-info-box" id="interactiveBlastInfo">
+              <span class="material-icons-outlined">info</span>
+              <span>Click on any dataset node above to view its downstream blast radius.</span>
+            </div>
+
+            <div class="divider"></div>
+            <h4 class="section-subtitle"><span class="material-icons-outlined">schema</span> Column-Level Lineage Mapping</h4>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Source Column</th>
+                    <th>Transitive Downstream Column Mapping</th>
+                  </tr>
+                </thead>
+                <tbody id="columnLineageTbody">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 5: SLO SIMULATOR ==================== -->
+      <section id="tab-slo" class="tab-panel">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="material-icons-outlined">speed</span>
+              <h3>Multi-Window Multi-Burn-Rate Alerting Simulator</h3>
+            </div>
+            <span class="badge badge-indigo">Google SRE Standard</span>
+          </div>
+          <div class="panel-body">
+            <div class="grid-2col">
+              <!-- Interactive Controls -->
+              <div class="sim-controls">
+                <h4 class="section-subtitle"><span class="material-icons-outlined">tune</span> Simulator Controls</h4>
+                
+                <div class="slider-group">
+                  <div class="slider-header">
+                    <label>SLO Target Reliability (%)</label>
+                    <span class="slider-val" id="simTargetVal">99.9%</span>
+                  </div>
+                  <input type="range" min="95.0" max="99.99" step="0.01" value="99.9" id="simTargetInput" oninput="recalcSimSLO()">
+                </div>
+
+                <div class="slider-group">
+                  <div class="slider-header">
+                    <label>Short Window (1h) Burn Rate</label>
+                    <span class="slider-val" id="simShortVal">14.4x</span>
+                  </div>
+                  <input type="range" min="0" max="30" step="0.5" value="14.4" id="simShortInput" oninput="recalcSimSLO()">
+                </div>
+
+                <div class="slider-group">
+                  <div class="slider-header">
+                    <label>Long Window (6h) Burn Rate</label>
+                    <span class="slider-val" id="simLongVal">14.4x</span>
+                  </div>
+                  <input type="range" min="0" max="30" step="0.5" value="14.4" id="simLongInput" oninput="recalcSimSLO()">
+                </div>
+
+                <div class="quick-preset-btns">
+                  <button class="btn btn-sm btn-secondary" onclick="setSLOPreset(14.4, 14.4)">Sustained Fast Burn (14.4x)</button>
+                  <button class="btn btn-sm btn-secondary" onclick="setSLOPreset(12.0, 1.2)">Transient Spike (Suppress)</button>
+                  <button class="btn btn-sm btn-secondary" onclick="setSLOPreset(6.0, 6.0)">Moderate Burn (6.0x)</button>
+                  <button class="btn btn-sm btn-secondary" onclick="setSLOPreset(0.5, 0.5)">Normal Operating</button>
+                </div>
+              </div>
+
+              <!-- Output Card -->
+              <div class="sim-output">
+                <h4 class="section-subtitle"><span class="material-icons-outlined">notifications_active</span> Alert Decision Output</h4>
+                <div class="alert-decision-card" id="simDecisionCard">
+                  <div class="decision-icon-box" id="simDecisionIconBox">
+                    <span class="material-icons-outlined" id="simDecisionIcon">notifications_active</span>
+                  </div>
+                  <div>
+                    <h3 id="simDecisionTitle">PAGE ON-CALL (CRITICAL)</h3>
+                    <p id="simDecisionReason">Sustained 14.4x burn rate across both short (1h) and long (6h) windows. Consuming 2% of budget in 1 hour.</p>
+                  </div>
+                </div>
+
+                <div class="table-responsive" style="margin-top: 16px;">
+                  <table class="data-table">
+                    <tr><th>Alert Level</th><th>Short (1h)</th><th>Long (6h)</th><th>Action</th></tr>
+                    <tr><td><strong>Critical</strong></td><td>&ge; 14.4x</td><td>&ge; 14.4x</td><td><span class="badge badge-red">Page On-Call</span></td></tr>
+                    <tr><td><strong>Warning</strong></td><td>&ge; 6.0x</td><td>&ge; 6.0x</td><td><span class="badge badge-yellow">Page / Ticket</span></td></tr>
+                    <tr><td><strong>Warning</strong></td><td>&ge; 3.0x</td><td>&ge; 3.0x</td><td><span class="badge badge-yellow-outline">Warning Log</span></td></tr>
+                    <tr><td><strong>Transient Spike</strong></td><td>&ge; 6.0x</td><td>&lt; 6.0x</td><td><span class="badge badge-green">Suppress (No Page)</span></td></tr>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 6: FAULT SANDBOX ==================== -->
+      <section id="tab-sandbox" class="tab-panel">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="material-icons-outlined">science</span>
+              <h3>Fault Injection &amp; Live Detection Testing</h3>
+            </div>
+          </div>
+            <div class="panel-body">
+              <div class="callout callout-info"><span class="material-icons-outlined">info</span> Reset to a clean baseline before injecting a different fault; each injection mutates the demo input files.</div>
+              <div class="grid-3col">
+              <!-- Fault 1 -->
+              <div class="fault-action-card">
+                <div class="fault-header">
+                  <span class="material-icons-outlined text-red">content_copy</span>
+                  <h4>Fault 1: Duplicate PK</h4>
+                </div>
+                <p class="panel-desc">Injects duplicate <code>order_id</code> rows into incoming orders batch to test deterministic uniqueness validation.</p>
+                <div class="fault-expected">
+                  <strong>Expected Layer:</strong> Data Contract (unique check on order_id)
+                </div>
+                <button class="btn btn-primary btn-block" onclick="executeBackendAction('inject_duplicate_pk')">
+                  <span class="material-icons-outlined">play_arrow</span>
+                  <span>Inject &amp; Run Test</span>
+                </button>
+              </div>
+
+              <!-- Fault 2 -->
+              <div class="fault-action-card">
+                <div class="fault-header">
+                  <span class="material-icons-outlined text-amber">trending_down</span>
+                  <h4>Fault 2: Volume Drop</h4>
+                </div>
+                <p class="panel-desc">Simulates a silent partial ingestion drop (600 &rarr; 150 rows) without runtime crash to test statistical anomaly detection.</p>
+                <div class="fault-expected">
+                  <strong>Expected Layer:</strong> Statistical Anomaly Detector (MAD / Z-score)
+                </div>
+                <button class="btn btn-primary btn-block" onclick="executeBackendAction('inject_volume_drop')">
+                  <span class="material-icons-outlined">play_arrow</span>
+                  <span>Inject &amp; Run Test</span>
+                </button>
+              </div>
+
+              <!-- Fault 3 -->
+              <div class="fault-action-card">
+                <div class="fault-header">
+                  <span class="material-icons-outlined text-purple">history_toggle_off</span>
+                  <h4>Fault 3: Stale KB</h4>
+                </div>
+                <p class="panel-desc">Shifts <code>published_at</code> timestamps in KB documents back 3 hours to verify contract-level freshness and SLA enforcement.</p>
+                <div class="fault-expected">
+                  <strong>Expected Layer:</strong> KB Contract (freshness &gt; 60 mins)
+                </div>
+                <button class="btn btn-primary btn-block" onclick="executeBackendAction('inject_stale_kb')">
+                  <span class="material-icons-outlined">play_arrow</span>
+                  <span>Inject &amp; Run Test</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button class="btn btn-secondary" onclick="executeBackendAction('reset')">
+                <span class="material-icons-outlined">restart_alt</span>
+                <span>Reset to Clean Baseline</span>
+              </button>
+              <button class="btn btn-primary" onclick="executeBackendAction('baseline')">
+                <span class="material-icons-outlined">refresh</span>
+                <span>Re-run Baseline</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 7: REPORTS ==================== -->
+      <section id="tab-reports" class="tab-panel">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="material-icons-outlined">summarize</span>
+              <h3>Incident Reports &amp; Engineering Journal</h3>
+            </div>
+            <div class="tab-btn-group">
+              <button class="subtab-btn active" onclick="switchReportTab('incident')">Incident Report</button>
+              <button class="subtab-btn" onclick="switchReportTab('agent')">Agent Decision Log</button>
+              <button class="subtab-btn" onclick="switchReportTab('changelog')">CHANGELOG.md</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="markdown-rendered-view" id="reportViewerBox">
+              Loading report document...
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Terminal Drawer (Slide-in bottom panel) -->
+    <div id="terminalDrawer" class="terminal-drawer">
+      <div class="terminal-header">
+        <div class="terminal-title">
+          <span class="material-icons-outlined">terminal</span>
+          <span id="terminalTitleText">Action Output Stream</span>
+        </div>
+        <div class="terminal-actions">
+          <button class="btn btn-icon btn-sm" onclick="clearTerminal()"><span class="material-icons-outlined">delete</span></button>
+          <button class="btn btn-icon btn-sm" onclick="toggleTerminalLog()"><span class="material-icons-outlined">close</span></button>
+        </div>
+      </div>
+      <pre class="terminal-body" id="terminalOutput">Ready. Click any action button to execute pipeline scripts.</pre>
+    </div>
+
+  </div>
+
+  <!-- Main Application Script -->
+  <script src="/app.js"></script>
+</body>
+</html>
