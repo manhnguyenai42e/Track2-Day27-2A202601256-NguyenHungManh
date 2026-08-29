@@ -14,14 +14,13 @@ unit_tests:
       rows:
         - {order_date: '2026-08-01', completed_order_rows: 2, daily_revenue: 170.0}
 
-  # Strong Challenge: SCD customer dimension has 2 active rows for same
-  # customer_id. The LEFT JOIN in fct_daily_revenue duplicates order rows,
-  # inflating both completed_order_rows and daily_revenue.
-  # This test EXPOSES the bug: expected correct values are 1 row / 100.0,
-  # but the model will produce 2 rows / 200.0 due to the fan-out join.
+  # Strong Challenge: SCD customer dimension has 2 active rows for the same
+  # customer_id. Without deduplication, the LEFT JOIN in fct_daily_revenue
+  # would fan out order rows and inflate both completed_order_rows and
+  # daily_revenue. fct_daily_revenue deduplicates active_customers to one
+  # row per customer_id, so the correct, non-inflated result is expected here.
   - name: scd_duplicate_customer_inflates_revenue
     model: fct_daily_revenue
-    expect_failure: true
     given:
       - input: ref('stg_orders')
         rows:

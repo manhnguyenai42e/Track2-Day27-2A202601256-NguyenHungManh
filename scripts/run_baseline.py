@@ -27,13 +27,16 @@ def main() -> None:
     failed = failed_issues(issues)
     critical_failed = failed_issues(issues, min_severity="critical")
 
-    # Anomaly detection on incoming order volume with context awareness
+    # Anomaly detection on incoming order volume with context awareness.
+    # `history` is always the full (non-segmented) row-count history so the
+    # detector can cross-check a narrow seasonal segment against overall
+    # system behavior; `same_segment_history` carries the day-of-week segment.
     current_dow = datetime.now().weekday()
     segment = history.loc[history["day_of_week"] == current_dow, "row_count"].tail(8).tolist()
-    row_history = segment if len(segment) >= 3 else history["row_count"].tail(14).tolist()
+    full_history = history["row_count"].tail(30).tolist()
     row_result = detect_anomaly(
         len(orders),
-        row_history,
+        full_history,
         method="auto",
         context={"metric_name": "row_count", "day_of_week": current_dow, "same_segment_history": segment},
     )

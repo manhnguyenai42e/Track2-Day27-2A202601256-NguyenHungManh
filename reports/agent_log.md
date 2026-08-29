@@ -23,3 +23,19 @@
 - **Evidence/test:** Phân biệt chính xác giữa spike ngắn hạn (`page=False`) và sustained fast burn (`page=True, severity=critical`).
 - **Accept / reject / revise:** Accept.
 - **Why:** Đúng chuẩn thực hành SRE quốc tế, tối ưu hóa độ tin cậy của hệ thống cảnh báo.
+
+## Decision 4: Fix dbt Native Unit Test dùng key không hợp lệ (`expect_failure`) làm sập toàn bộ `make dbt`
+- **Hypothesis:** Unit test `scd_duplicate_customer_inflates_revenue` dùng `expect_failure: true` để "expose" bug fan-out join khi SCD customer dimension có 2 active row/customer_id. Đây không phải property hợp lệ trong schema unit test của dbt 1.12 (dbt parse lỗi ngay từ đầu), khiến `dbt build` dừng lại trước khi chạy bất kỳ model/test nào khác.
+- **Prompt / request to agent:** Rà soát lại tại sao `make dbt` báo `Parsing Error` và sửa cho `dbt build` chạy sạch hoàn toàn.
+- **Agent proposal:** (1) Sửa `fct_daily_revenue.sql`: dedupe `active_customers` còn đúng 1 dòng/`customer_id` (`ROW_NUMBER() OVER (PARTITION BY customer_id ...) = 1`) trước khi LEFT JOIN, loại bỏ fan-out. (2) Sửa `unit_tests.yml`: bỏ `expect_failure`, đổi `expect.rows` về giá trị đúng theo business logic (1 row / 100.0) — test giờ xác nhận model đã fix bug, không còn dựa vào hành vi sai để pass.
+- **Evidence/test:** `dbt build --project-dir dbt_project --profiles-dir dbt_project` → `Done. PASS=20 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=20`. Trước khi sửa: `ERROR` ngay bước parsing, 6/20 node bị SKIP.
+- **Accept / reject / revise:** Accept.
+- **Why:** Không chỉ viết test phát hiện bug (yêu cầu "Strong challenge" Phase 2) mà còn khắc phục root cause trong model, đồng thời đảm bảo `make dbt` — lệnh chuẩn theo README — chạy được trọn vẹn khi chấm điểm.
+
+## Decision 5: Fix false positive anomaly trên baseline khỏe vào cuối tuần
+- **Hypothesis:** `data/baseline/orders.csv` là sample tĩnh cố định 600 dòng bất kể ngày trong tuần, nhưng `data/history/metrics_history.csv` có seasonality thật (thứ 7/CN chỉ ~235–274 dòng/ngày so với ~565–651 ngày thường). `scripts/run_baseline.py` truyền segment cuối tuần (không phải toàn bộ lịch sử) làm tham số `history` cho `detect_anomaly`, khiến seasonal-MAD luôn báo `is_anomaly=True` trên baseline khỏe mỗi khi chạy vào thứ 7/CN — mâu thuẫn với Decision 2 (giảm alert fatigue) và yêu cầu Phase 0 (baseline phải chạy sạch).
+- **Prompt / request to agent:** Sửa để anomaly detector không báo động giả trên baseline khỏe, nhưng vẫn phải bắt được `volume_drop` fault thật.
+- **Agent proposal:** (1) `scripts/run_baseline.py`: truyền `history` luôn là toàn bộ row-count lịch sử (30 ngày gần nhất), tách biệt với `context.same_segment_history` (chỉ chứa segment theo ngày trong tuần) — đúng thiết kế mô tả trong `docs/STUDENT_API.md`. (2) `observability/anomaly.py` (`detect_anomaly`, method=`auto`): khi seasonal segment báo anomaly nhưng giá trị hiện tại vẫn nằm trong dải bình thường của lịch sử toàn cục (global MAD không coi là anomaly), hạ verdict xuống `False` và ghi rõ lý do (`+global_crosscheck`) thay vì tin tưởng mù quáng một segment hẹp (5-8 điểm).
+- **Evidence/test:** Baseline khỏe (`make reset` → `run_baseline.py`) vào thứ 7: trước fix `is_anomaly=True, score=18.75`; sau fix `is_anomaly=False` (`auto:seasonal_mad+global_crosscheck`). `volume_drop` fault (150/600 rows) vẫn `is_anomaly=True, score=5.53` sau fix — không bị che giấu. `duplicate_pk` và `stale_kb` không đổi hành vi (không phụ thuộc row-count anomaly). 18/18 `tests_public` vẫn pass.
+- **Accept / reject / revise:** Accept.
+- **Why:** Một seasonal baseline chỉ dựa vào 5-8 điểm dữ liệu hẹp dễ tự tin thái quá; đối chiếu với lịch sử toàn cục trước khi kết luận anomaly là thực hành robust-baseline chuẩn, và ngăn "cry wolf" làm giảm độ tin cậy của cảnh báo — đúng tinh thần chống Alert Fatigue đã đặt ra ở Decision 2.

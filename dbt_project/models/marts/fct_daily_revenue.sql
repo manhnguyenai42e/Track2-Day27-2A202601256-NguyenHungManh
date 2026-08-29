@@ -1,6 +1,9 @@
--- NOTE: This model is intentionally simple. If the customer dimension has more
--- than one active row per customer, the join can inflate revenue without a SQL
--- error. Students should add tests/unit tests that expose this failure mode.
+-- The customer dimension (SCD) can carry more than one active row per
+-- customer_id. A plain left join on that raw dimension fans out completed
+-- orders and inflates both completed_order_rows and daily_revenue without
+-- any SQL error. We deduplicate to exactly one active row per customer_id
+-- before joining so revenue reflects reality regardless of upstream SCD
+-- duplicates. See unit test `scd_duplicate_customer_inflates_revenue`.
 
 with completed_orders as (
     select *
@@ -8,9 +11,19 @@ with completed_orders as (
     where status = 'completed'
 ),
 active_customers as (
-    select *
-    from {{ ref('stg_customers') }}
-    where is_active = true
+    select customer_id, is_active
+    from (
+        select
+            customer_id,
+            is_active,
+            row_number() over (
+                partition by customer_id
+                order by customer_id
+            ) as rn
+        from {{ ref('stg_customers') }}
+        where is_active = true
+    )
+    where rn = 1
 )
 select
     o.order_date,

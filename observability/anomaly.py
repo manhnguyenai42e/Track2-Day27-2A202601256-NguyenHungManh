@@ -93,8 +93,9 @@ def detect_anomaly(
         ctx = context or {}
         segment_history = ctx.get("same_segment_history")
         known_event = ctx.get("known_event")
-        effective_history = list(segment_history) if segment_history and len(segment_history) >= 3 else list(history)
-        
+        full_history = list(history)
+        effective_history = list(segment_history) if segment_history and len(segment_history) >= 3 else full_history
+
         # Use MAD for robust baseline if history is sufficient, otherwise fallback to Z-score
         if len(effective_history) >= 5:
             base_result = mad_detector(current, effective_history, threshold=threshold if threshold != 3.0 else 3.5)
@@ -106,6 +107,22 @@ def detect_anomaly(
         is_anomaly = base_result["is_anomaly"]
         score = base_result["score"]
         reason = base_result["reason"]
+
+        # Cross-check against the global (non-segmented) history. A narrow
+        # seasonal segment (e.g. only 5-8 weekend points) can flag a value as
+        # anomalous purely because that segment's own variance is small, even
+        # though the value is unremarkable for the system as a whole. When
+        # that happens, downgrade the seasonal verdict instead of trusting a
+        # single narrow segment blindly.
+        if is_anomaly and segment_history and len(full_history) >= 5:
+            global_result = mad_detector(current, full_history, threshold=threshold if threshold != 3.0 else 3.5)
+            if not global_result["is_anomaly"]:
+                is_anomaly = False
+                used_method = f"{used_method}+global_crosscheck"
+                reason = (
+                    f"{reason}; suppressed: value is within normal range of global history "
+                    f"({global_result['reason']}) despite narrow seasonal segment"
+                )
 
         # If a known event explains the shift, suppress or note it
         if known_event and is_anomaly:
