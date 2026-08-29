@@ -43,8 +43,7 @@ def evaluate_multiwindow_burn(
     Prevents alert fatigue by requiring both short and long windows to exceed
     thresholds before paging on-call.
     - Critical (Page): short >= 14.4x (2% budget in 1h) and long >= 14.4x
-    - High (Page/Ticket): short >= 6.0x (5% budget in 6h) and long >= 6.0x
-    - Medium (Warning): short >= 3.0x and long >= 3.0x
+    - Warning (Page/Ticket): short >= 6.0x (5% budget in 6h) and long >= 6.0x
     - Transient Spike: short is high but long is low -> No page (info/ticket)
     """
     short = float(short_window_burn)
@@ -64,23 +63,13 @@ def evaluate_multiwindow_burn(
     if short >= 6.0 and long >= 6.0:
         return {
             "page": True,
-            "severity": "high",
+            "severity": "warning",
             "reason": f"Sustained 6.0x burn rate across 1h/6h windows (short={short:.1f}, long={long:.1f})",
             "short_window_burn": short,
             "long_window_burn": long,
         }
 
-    # 3. Sustained Moderate Burn (3.0x)
-    if short >= 3.0 and long >= 3.0:
-        return {
-            "page": True,
-            "severity": "warning",
-            "reason": f"Sustained 3.0x burn rate across windows (short={short:.1f}, long={long:.1f})",
-            "short_window_burn": short,
-            "long_window_burn": long,
-        }
-
-    # 4. Transient Spike (short window burned fast, but long window is healthy)
+    # 3. Transient Spike (short window burned fast, but long window is healthy)
     if short >= 6.0 and long < 6.0:
         return {
             "page": False,
@@ -90,7 +79,7 @@ def evaluate_multiwindow_burn(
             "long_window_burn": long,
         }
 
-    # 5. Normal / within budget
+    # 4. Normal / within budget
     return {
         "page": False,
         "severity": "info",

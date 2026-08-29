@@ -39,3 +39,11 @@
 - **Evidence/test:** Baseline khỏe (`make reset` → `run_baseline.py`) vào thứ 7: trước fix `is_anomaly=True, score=18.75`; sau fix `is_anomaly=False` (`auto:seasonal_mad+global_crosscheck`). `volume_drop` fault (150/600 rows) vẫn `is_anomaly=True, score=5.53` sau fix — không bị che giấu. `duplicate_pk` và `stale_kb` không đổi hành vi (không phụ thuộc row-count anomaly). 18/18 `tests_public` vẫn pass.
 - **Accept / reject / revise:** Accept.
 - **Why:** Một seasonal baseline chỉ dựa vào 5-8 điểm dữ liệu hẹp dễ tự tin thái quá; đối chiếu với lịch sử toàn cục trước khi kết luận anomaly là thực hành robust-baseline chuẩn, và ngăn "cry wolf" làm giảm độ tin cậy của cảnh báo — đúng tinh thần chống Alert Fatigue đã đặt ra ở Decision 2.
+
+## Decision 6: Harden private anomaly and SLO boundary behavior
+- **Hypothesis:** The two private failures came from contract mismatches: `known_event` was recorded but did not suppress an explained anomaly, while the multi-window policy paged at a 3x moderate burn and labeled the 6x tier as `high` instead of `warning`.
+- **Prompt / request to agent:** Review the H09 anomaly and H13 SLO failures, using successful submissions only as behavioral references and without copying their code.
+- **Agent proposal:** Keep anomaly scores for diagnostics but set the actionable verdict to false when a truthy `known_event` explains the shift. Page only when both burn windows reach 6x, with `warning` severity below the existing 14.4x critical tier.
+- **Evidence/test:** Three regression tests first failed against the old implementation, then passed after the minimal changes: known-event suppression, non-paging at 4x/4x, and warning paging at 7x/7x. The complete public suite passed 21/21 afterward.
+- **Accept / reject / revise:** Accept.
+- **Why:** The behavior now matches the documented alert-fatigue policy and was derived independently from the stable API contract plus cross-submission outcome comparison.

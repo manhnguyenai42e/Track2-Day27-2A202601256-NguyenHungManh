@@ -26,3 +26,17 @@ def test_multiwindow_burn_transient_spike_suppressed():
     res = multiwindow_burn(short_window_burn=15.0, long_window_burn=2.0)
     assert res["page"] is False
     assert res["severity"] == "info"
+
+
+def test_multiwindow_burn_moderate_rate_does_not_page():
+    res = multiwindow_burn(short_window_burn=4.0, long_window_burn=4.0)
+
+    assert res["page"] is False
+    assert res["severity"] == "info"
+
+
+def test_multiwindow_burn_sustained_warning_uses_warning_severity():
+    res = multiwindow_burn(short_window_burn=7.0, long_window_burn=7.0)
+
+    assert res["page"] is True
+    assert res["severity"] == "warning"

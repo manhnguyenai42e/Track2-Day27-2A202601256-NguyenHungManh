@@ -124,9 +124,11 @@ def detect_anomaly(
                     f"({global_result['reason']}) despite narrow seasonal segment"
                 )
 
-        # If a known event explains the shift, suppress or note it
+        # A known event makes the shift expected, so retain the diagnostic
+        # score but suppress the actionable anomaly verdict.
         if known_event and is_anomaly:
-            reason += f"; known_event='{known_event}'"
+            is_anomaly = False
+            reason += f"; suppressed_by_known_event='{known_event}'"
 
         return {
             "is_anomaly": is_anomaly,

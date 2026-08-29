@@ -31,3 +31,15 @@ def test_auto_context_seasonality():
         context={"day_of_week": 6, "same_segment_history": weekend_history},
     )
     assert result["is_anomaly"] is False
+
+
+def test_auto_known_event_suppresses_explained_anomaly():
+    result = detect_metric(
+        200,
+        [100, 100, 100, 100, 100],
+        method="auto",
+        context={"known_event": "planned_campaign"},
+    )
+
+    assert result["is_anomaly"] is False
+    assert "known_event" in result["reason"]
